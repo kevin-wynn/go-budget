@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -47,7 +48,7 @@ type Transaction struct {
 	Account    Account
 	CategoryID int
 	Category   Category
-	Amount     int
+	Amount     float32
 	PayeeID    int
 	Payee      Payee
 }
@@ -98,34 +99,96 @@ func SetUpDatabase(b Budget) {
 	}
 }
 
+func ReturnJSON(w http.ResponseWriter, r []byte) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	w.Write(r)
+}
+
 func AccountsHandler(w http.ResponseWriter, r *http.Request) {
 	var accounts = []Account{}
 
 	db.Find(&accounts)
-	json.NewEncoder(w).Encode(&accounts)
 	a, err := json.Marshal(&accounts)
 	if err != nil {
 		log.Fatalf("failed to marshal json for accounts %v", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(a)
+	ReturnJSON(w, a)
 }
 
 func CategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	var categories = []Category{}
 
 	db.Find(&categories)
-	json.NewEncoder(w).Encode(&categories)
 	c, err := json.Marshal(&categories)
 	if err != nil {
 		log.Fatalf("failed to marshal json for categories %v", err)
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	w.Write(c)
+	ReturnJSON(w, c)
+}
+
+func TransactionsHandler(w http.ResponseWriter, r *http.Request) {
+
+	switch r.Method {
+	case "POST":
+		var tt struct {
+			Payee    string
+			Amount   float32
+			Category string
+			Account  string
+			Date     time.Time
+		}
+		body, err := io.ReadAll(r.Body)
+		if err != nil {
+			log.Fatalf("failed to read json body for transactions %v", err)
+		}
+		err = json.Unmarshal(body, &tt)
+		if err != nil {
+			log.Fatalf("failed to unmarshal json body for transactions %v", err)
+		}
+
+		// look up payee to assign
+		var p = Payee{Name: tt.Payee}
+		var c = Category{Name: tt.Category}
+		var a = Account{Name: tt.Account}
+
+		db.FirstOrCreate(&p)
+		db.First(&c)
+		db.First(&a)
+
+		var t = Transaction{
+			Account:  a,
+			Category: c,
+			Payee:    p,
+			Amount:   tt.Amount,
+			Date:     tt.Date,
+		}
+
+		result := db.Create(&t)
+		if result.Error != nil {
+			log.Fatalf("failed to create new transaction %v", result.Error)
+		}
+
+		rt, err := json.Marshal(&t)
+		if err != nil {
+			log.Fatalf("failed to marshal json for transactions %v", err)
+		}
+
+		ReturnJSON(w, rt)
+
+	case "GET":
+		var transactions = []Transaction{}
+
+		db.Joins("Account").Joins("Category").Joins("Payee").Find(&transactions)
+		t, err := json.Marshal(&transactions)
+		if err != nil {
+			log.Fatalf("failed to marshal json for transactions %v", err)
+		}
+
+		ReturnJSON(w, t)
+	}
 }
 
 func main() {
@@ -136,6 +199,7 @@ func main() {
 	r := mux.NewRouter()
 	r.HandleFunc("/accounts", AccountsHandler)
 	r.HandleFunc("/categories", CategoriesHandler)
+	r.HandleFunc("/transactions", TransactionsHandler).Methods("GET", "POST")
 
 	srv := &http.Server{
 		Handler:      r,
