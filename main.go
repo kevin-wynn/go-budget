@@ -16,27 +16,46 @@ import (
 
 var db *gorm.DB
 
+type Budget struct {
+	Categories []Category
+	Accounts   []Account
+}
+
 type Account struct {
 	gorm.Model
+	ID   int
 	Name string `gorm:"unique"`
 	Type string
 }
 
 type Category struct {
 	gorm.Model
+	ID   int
 	Name string `gorm:"unique"`
 	Due  int
 }
 
-type Budget struct {
-	Categories []Category
-	Accounts   []Account
+type Payee struct {
+	gorm.Model
+	Name string `gorm:"unique"`
+}
+
+type Transaction struct {
+	gorm.Model
+	Date       time.Time
+	AccountID  int
+	Account    Account
+	CategoryID int
+	Category   Category
+	Amount     int
+	PayeeID    int
+	Payee      Payee
 }
 
 func (b *Budget) GetBudget() *Budget {
 	y, err := os.ReadFile("budget.yaml")
 	if err != nil {
-		log.Printf("y.Get err   #%v ", err)
+		log.Fatalf("error reading budget yaml file %v ", err)
 	}
 	err = yaml.Unmarshal(y, b)
 	if err != nil {
@@ -49,10 +68,10 @@ func SetUpDatabase(b Budget) {
 	var err error
 	db, err = gorm.Open(sqlite.Open("gb.db"), &gorm.Config{})
 	if err != nil {
-		panic("failed to connect database")
+		log.Fatalf("failed to connect database %v", err)
 	}
 
-	db.AutoMigrate(&Account{}, &Category{})
+	db.AutoMigrate(&Account{}, &Category{}, &Payee{}, &Transaction{})
 
 	accounts := []Account{}
 
@@ -69,13 +88,13 @@ func SetUpDatabase(b Budget) {
 	ar := db.Clauses(clause.OnConflict{UpdateAll: true, Columns: []clause.Column{{Name: "name"}}}).
 		Create(accounts)
 	if ar.Error != nil {
-		log.Panicf("failed to create initial accounts %v", ar.Error)
+		log.Fatalf("failed to create initial accounts %v", ar.Error)
 	}
 
 	cr := db.Clauses(clause.OnConflict{UpdateAll: true, Columns: []clause.Column{{Name: "name"}}}).
 		Create(categories)
 	if cr.Error != nil {
-		panic("failed to create initial categories")
+		log.Fatalf("failed to create initial categories %v", cr.Error)
 	}
 }
 
@@ -86,7 +105,7 @@ func AccountsHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&accounts)
 	a, err := json.Marshal(&accounts)
 	if err != nil {
-		panic("failed to marshal json for accounts")
+		log.Fatalf("failed to marshal json for accounts %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -101,7 +120,7 @@ func CategoriesHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(&categories)
 	c, err := json.Marshal(&categories)
 	if err != nil {
-		panic("failed to marshal json for categories")
+		log.Fatalf("failed to marshal json for categories %v", err)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
