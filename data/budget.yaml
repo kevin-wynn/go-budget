@@ -1,0 +1,16 @@
+categories:
+  - name: Mortgage
+    due: 1
+  - name: Internet
+    due: 1
+  - name: Utilities
+    due: 1
+  - name: Amex
+    due: 18
+  - name: Discover (Kevin)
+    due: 1
+accounts:
+  - name: Capital One Checking
+    type: checking
+  - name: Capital One Savings
+    type: savings

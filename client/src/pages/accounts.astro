@@ -1,0 +1,19 @@
+---
+import { Accounts as AccountsComponent } from "../components/Accounts";
+import Head from "../components/Head.astro";
+import { Navigation } from "../components/Navigation";
+import type { Account } from "../types/Accounts";
+
+const accountsReq = await fetch(
+  `http://localhost:${import.meta.env.PUBLIC_SERVER_PORT}/accounts`
+);
+const accounts = (await accountsReq.json()) as Account[];
+---
+
+<html lang="en">
+  <Head />
+  <body class="bg-gray-900 p-12">
+    <Navigation pathname={Astro.url.pathname} />
+    {accounts && <AccountsComponent accounts={accounts} />}
+  </body>
+</html>

@@ -23,5 +23,5 @@ go.work.sum
 
 __debug*
 
-budget.yaml
-gb.db
+data/budget.yaml
+data/gb.db

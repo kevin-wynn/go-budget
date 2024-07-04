@@ -1,0 +1,13 @@
+---
+import Head from "../components/Head.astro";
+import { Navigation } from "../components/Navigation";
+import { TransactionsTable } from "../components/TransactionsTable";
+---
+
+<html lang="en">
+  <Head />
+  <body class="bg-gray-900 p-12">
+    <Navigation pathname={Astro.url.pathname} />
+    <TransactionsTable client:only="react" />
+  </body>
+</html>
